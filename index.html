@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wavy Halftone Pro</title>
+<style>
+:root{--bg:#0d0f12;--panel:#171a20;--panel2:#20242c;--text:#f3f5f7;--muted:#9da4af;--accent:#72a7ff;--border:#303641}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+header{padding:20px 26px;border-bottom:1px solid var(--border);background:#121419}h1{font-size:23px;margin:0 0 5px}header p{margin:0;color:var(--muted);font-size:13px}
+.app{display:grid;grid-template-columns:350px 1fr;gap:16px;max-width:1550px;margin:auto;padding:16px}.panel{background:var(--panel);border:1px solid var(--border);border-radius:13px;padding:17px}
+h2{font-size:16px;margin:0 0 14px}.section{border-top:1px solid var(--border);padding-top:14px;margin-top:14px}
+.control{margin:13px 0}label{display:flex;justify-content:space-between;gap:8px;font-size:13px;margin-bottom:7px}label span{font-weight:700;color:var(--accent)}
+input[type=range]{width:100%;accent-color:var(--accent)}select,input[type=number]{width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:9px;border-radius:7px}
+input[type=file]{width:100%;font-size:12px}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+button.analyze{padding:14px 10px;margin-top:14px;background:linear-gradient(135deg,#7c5cff,#3d9cff);color:white;font-size:14px;box-shadow:0 5px 18px rgba(61,156,255,.18)}
+button.analyze:active{transform:translateY(1px)}
+button{width:100%;padding:10px;border:0;border-radius:8px;margin-top:8px;background:#303641;color:white;font-weight:700;cursor:pointer}button.primary{background:var(--accent);color:#07101c}button:disabled{opacity:.4;cursor:not-allowed}
+.switch{display:flex;align-items:center;justify-content:space-between;padding:10px;background:var(--panel2);border-radius:8px}.switch label{margin:0}.switch input{width:18px;height:18px}
+.preview{background:var(--panel);border:1px solid var(--border);border-radius:13px;padding:12px}.bar{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;margin-bottom:10px}
+.canvas-wrap{height:calc(100vh - 135px);min-height:480px;display:flex;align-items:center;justify-content:center;overflow:auto;border-radius:9px;background-color:#ddd;background-image:linear-gradient(45deg,#ccc 25%,transparent 25%),linear-gradient(-45deg,#ccc 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#ccc 75%),linear-gradient(-45deg,transparent 75%,#ccc 75%);background-size:20px 20px;background-position:0 0,0 10px,10px -10px,-10px 0}
+canvas{background:white;max-width:100%;max-height:100%;width:auto;height:auto}.status{font-size:11px;color:var(--muted);margin-top:10px;line-height:1.4}
+@media(max-width:850px){.app{grid-template-columns:1fr}.canvas-wrap{height:65vh}}
+</style>
+</head>
+<body>
+<header><h1>Wavy Halftone Pro</h1><p>Conversion d'image en lignes ondulées vectorielles — optimisée pour traceur et gravure.</p></header>
+<main class="app">
+<aside class="panel">
+<h2>Image</h2>
+<input id="file" type="file" accept="image/*">
+
+<div class="section"><h2>Forme des lignes</h2>
+<div class="control"><label>Nombre de lignes <span id="linesV"></span></label><input id="lines" type="range" min="10" max="300" value="120"></div>
+<div class="control"><label>Amplitude maximale <span id="ampV"></span></label><input id="amp" type="range" min="0" max="100" value="32"></div>
+<div class="control"><label>Fréquence <span id="freqV"></span></label><input id="freq" type="range" min="0.2" max="20" step="0.1" value="4"></div>
+<div class="control"><label>Contraste de modulation <span id="contrastV"></span></label><input id="contrast" type="range" min="0.2" max="4" step="0.1" value="1.6"></div>
+<div class="control"><label>Seuil / densité minimale <span id="thresholdV"></span></label><input id="threshold" type="range" min="0" max="100" value="4"></div>
+</div>
+
+<div class="section"><h2>Analyse de l'image</h2>
+<div class="control"><label>Zone d'analyse verticale <span id="sampleV"></span></label><input id="sample" type="range" min="1" max="100" value="35"></div>
+<div class="control"><label>Lissage <span id="smoothV"></span></label><input id="smooth" type="range" min="0" max="10" value="3"></div>
+<div class="control"><label>Qualité SVG <span id="qualityV"></span></label><input id="quality" type="range" min="1" max="5" value="2"></div>
+<div class="control"><label>Mode de modulation</label>
+<select id="mode">
+<option value="dark">Onduler les zones sombres</option>
+<option value="light">Onduler les zones claires</option>
+<option value="both">Sombres + claires</option>
+</select></div>
+<div class="switch"><label>Inverser le rendu</label><input id="invert" type="checkbox"></div>
+</div>
+
+<button id="analyze" class="analyze" disabled>✨ Analyser & trouver le meilleur résultat</button>
+<button id="export" class="primary" disabled>Exporter en SVG</button>
+<button id="reset">Réinitialiser</button>
+<div id="analysisResult" class="status"></div>
+<div id="status" class="status">Chargez une image.</div>
+</aside>
+
+<section class="preview"><div class="bar"><strong>Prévisualisation</strong><span id="dim">—</span></div><div class="canvas-wrap"><canvas id="canvas"></canvas></div></section>
+</main>
+
+<script>
+(() => {
+"use strict";
+const $=id=>document.getElementById(id);
+const canvas=$("canvas"),ctx=canvas.getContext("2d");
+const src=document.createElement("canvas"),sctx=src.getContext("2d",{willReadFrequently:true});
+let img=null,data=null, timer=null;
+
+const C={lines:$("lines"),amp:$("amp"),freq:$("freq"),contrast:$("contrast"),threshold:$("threshold"),sample:$("sample"),smooth:$("smooth"),quality:$("quality"),mode:$("mode"),invert:$("invert")};
+function labels(){
+ $("linesV").textContent=C.lines.value;
+ $("ampV").textContent=C.amp.value+"%";
+ $("freqV").textContent=Number(C.freq.value).toFixed(1);
+ $("contrastV").textContent=Number(C.contrast.value).toFixed(1);
+ $("thresholdV").textContent=C.threshold.value+"%";
+ $("sampleV").textContent=C.sample.value+"%";
+ $("smoothV").textContent=C.smooth.value;
+ $("qualityV").textContent=C.quality.value+"×";
+}
+function schedule(){labels();clearTimeout(timer);timer=setTimeout(render,25)}
+
+function prepare(){
+ const max=1800,scale=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));
+ src.width=Math.max(1,Math.round(img.naturalWidth*scale));src.height=Math.max(1,Math.round(img.naturalHeight*scale));
+ sctx.fillStyle="#fff";sctx.fillRect(0,0,src.width,src.height);sctx.drawImage(img,0,0,src.width,src.height);
+ data=sctx.getImageData(0,0,src.width,src.height);
+ $("dim").textContent=src.width+" × "+src.height+" px";
+}
+
+/* Cache de luminance : beaucoup plus rapide que getImageData à chaque point. */
+function lum(x,y){
+ x=Math.max(0,Math.min(src.width-1,x|0));y=Math.max(0,Math.min(src.height-1,y|0));
+ const i=(y*src.width+x)*4,d=data.data;
+ return (0.2126*d[i]+0.7152*d[i+1]+0.0722*d[i+2])/255;
+}
+
+/* Modulation plus propre :
+   - moyenne sur une fenêtre verticale
+   - courbe de contraste
+   - seuil
+   - éventuellement symétrisation pour préserver les blancs/noirs
+*/
+function strengthAt(x,y,spacing){
+ const window=spacing*(Number(C.sample.value)/100);
+ const radius=Math.max(0.5,window);
+ const n=5;
+ let sum=0,weight=0;
+ for(let k=0;k<n;k++){
+   const t=n===1?0:(k/(n-1))*2-1;
+   const w=1-Math.abs(t);
+   sum+=lum(x,y+t*radius)*w;weight+=w;
+ }
+ let l=sum/weight;
+ let dark=1-l, light=l;
+ let s;
+ if(C.mode.value==="dark")s=dark;
+ else if(C.mode.value==="light")s=light;
+ else s=Math.max(dark,light)*2-1;
+ if(C.invert.checked)s=1-s;
+ s=Math.max(0,(s-Number(C.threshold.value)/100)/(1-Number(C.threshold.value)/100));
+ return Math.pow(Math.min(1,s),Number(C.contrast.value));
+}
+
+/* Génère un chemin avec des points adaptatifs : plus de points dans les zones
+   fortement modulées, moins dans les zones plates. */
+function generatePaths(){
+ const w=src.width,h=src.height,N=Number(C.lines.value),spacing=h/N;
+ const amp=spacing*3.8*(Number(C.amp.value)/100);
+ const freq=Number(C.freq.value),q=Number(C.quality.value);
+ const baseStep=Math.max(1.2,3.2/q);
+ const paths=[];
+ for(let r=0;r<N;r++){
+   const y0=r*spacing+spacing/2;
+   let d="",x=0;
+   let first=true;
+   while(x<=w){
+     const s=strengthAt(x,y0,spacing);
+     const phase=(x/w)*Math.PI*2*freq;
+     const y=y0+Math.sin(phase)*amp*s;
+     d+=(first?"M ":" L ")+x.toFixed(2)+" "+y.toFixed(2);
+     first=false;
+     // précision accrue quand la ligne est très déformée
+     const step=baseStep*(1-0.55*s);
+     x+=Math.max(0.8,step);
+   }
+   paths.push(d);
+ }
+ return {paths,w,h,spacing};
+}
+
+function render(){
+ if(!img||!data)return;
+ const g=generatePaths();canvas.width=g.w;canvas.height=g.h;
+ ctx.fillStyle="#fff";ctx.fillRect(0,0,g.w,g.h);
+ ctx.strokeStyle="#000";ctx.lineWidth=Math.max(.45,Math.min(1.7,g.w/1800));ctx.lineCap="round";ctx.lineJoin="round";
+ ctx.beginPath();for(const d of g.paths){
+   const tok=d.trim().split(/\s+/);let i=0;
+   while(i<tok.length){const cmd=tok[i++];const x=parseFloat(tok[i++]),y=parseFloat(tok[i++]);if(cmd==="M")ctx.moveTo(x,y);else ctx.lineTo(x,y)}
+ }ctx.stroke();
+ $("status").textContent=`${g.paths.length} lignes · ${Number(C.freq.value).toFixed(1)} cycles · modulation optimisée`;
+}
+
+
+/* Analyse automatique :
+   On teste un ensemble de réglages et on mesure la qualité de la
+   représentation par rapport à l'image source. Le score favorise :
+   - une bonne corrélation entre luminosité et amplitude
+   - peu de bruit
+   - une couverture régulière de l'image
+   - des paramètres raisonnables pour le tracé vectoriel
+*/
+function autoAnalyze(){
+ if(!img||!data)return;
+
+ const button=$("analyze");
+ button.disabled=true;
+ button.textContent="⏳ Analyse en cours…";
+ $("analysisResult").textContent="Recherche automatique des paramètres…";
+
+ const old={
+   lines:C.lines.value, amp:C.amp.value, freq:C.freq.value,
+   contrast:C.contrast.value, threshold:C.threshold.value,
+   sample:C.sample.value, quality:C.quality.value,
+   mode:C.mode.value, invert:C.invert.checked
+ };
+
+ // Analyse rapide sur une miniature afin de pouvoir tester beaucoup de combinaisons.
+ const maxW=260,maxH=260;
+ const sc=Math.min(1,maxW/src.width,maxH/src.height);
+ const aw=Math.max(20,Math.round(src.width*sc));
+ const ah=Math.max(20,Math.round(src.height*sc));
+ const ac=document.createElement("canvas");ac.width=aw;ac.height=ah;
+ const ax=ac.getContext("2d",{willReadFrequently:true});
+ ax.drawImage(src,0,0,aw,ah);
+ const ad=ax.getImageData(0,0,aw,ah).data;
+
+ function L(x,y){
+   x=Math.max(0,Math.min(aw-1,x|0));y=Math.max(0,Math.min(ah-1,y|0));
+   const i=(y*aw+x)*4;
+   return (0.2126*ad[i]+0.7152*ad[i+1]+0.0722*ad[i+2])/255;
+ }
+
+ // Mesure la complexité utile de l'image.
+ let mean=0,variance=0,edges=0,n=0;
+ for(let y=0;y<ah;y+=2)for(let x=0;x<aw;x+=2){
+   const v=L(x,y);mean+=v;n++;
+   if(x>0)edges+=Math.abs(v-L(x-2,y));
+   if(y>0)edges+=Math.abs(v-L(x,y-2));
+ }
+ mean/=n; edges/=Math.max(1,n*2);
+
+ for(let y=0;y<ah;y+=3)for(let x=0;x<aw;x+=3) variance+=(L(x,y)-mean)**2;
+ variance/=Math.max(1,Math.floor(ah/3)*Math.floor(aw/3));
+ const std=Math.sqrt(variance);
+
+ // Nombre de lignes adapté à la résolution et à la complexité.
+ let targetLines=Math.round(55 + std*170 + Math.min(35,edges*140));
+ targetLines=Math.max(45,Math.min(230,targetLines));
+
+ // Fréquence adaptée : détails fins => fréquence supérieure,
+ // mais limitée pour éviter un SVG inutilement tortueux.
+ let targetFreq=2.2 + Math.min(8.5,edges*24);
+ if(std<0.16)targetFreq*=0.72;
+ targetFreq=Math.max(1.5,Math.min(12,targetFreq));
+
+ let targetAmp=28 + Math.min(42,std*100);
+ if(edges>0.10)targetAmp+=7;
+ targetAmp=Math.max(18,Math.min(78,targetAmp));
+
+ let targetContrast=1.25 + Math.min(1.45,std*2.2);
+ let targetThreshold=Math.max(2,Math.min(14,4 + (0.20-std)*25));
+
+ // Tester plusieurs variantes autour de cette estimation.
+ const lineCandidates=[targetLines-30,targetLines,targetLines+30];
+ const freqCandidates=[targetFreq*.75,targetFreq,targetFreq*1.25];
+ const ampCandidates=[targetAmp*.8,targetAmp,targetAmp*1.2];
+ const contrastCandidates=[targetContrast*.8,targetContrast,targetContrast*1.15];
+
+ let best=null;
+ const originalLines=C.lines.value;
+ const originalAmp=C.amp.value;
+ const originalFreq=C.freq.value;
+ const originalContrast=C.contrast.value;
+ const originalThreshold=C.threshold.value;
+
+ function score(lines,amp,freq,contrast,threshold){
+   const spacing=ah/lines;
+   let signal=0, grad=0, smooth=0, samples=0;
+   for(let r=0;r<lines;r++){
+     const y0=r*spacing+spacing/2;
+     let prev=0;
+     for(let x=0;x<aw;x+=4){
+       const l=L(x,y0);
+       let s=Math.pow(Math.max(0,(1-l-threshold/100)/(1-threshold/100)),contrast);
+       signal+=s;
+       if(x)grad+=Math.abs(s-prev);
+       prev=s;smooth+=Math.abs(s-(1-L(Math.min(aw-1,x+3),y0)));
+       samples++;
+     }
+   }
+   signal/=samples;grad/=samples;smooth/=samples;
+
+   // Image riche : plus de modulation. Image plate : on évite le sur-traitement.
+   const target=std*0.95;
+   const signalFit=1-Math.min(1,Math.abs(signal-target));
+   const regularity=1/(1+grad*2.8);
+   const detail=Math.min(1,grad*7);
+   const complexityPenalty=Math.max(0,(lines-190)/160);
+   const svgPenalty=Math.max(0,(freq-10)/10);
+   return signalFit*0.38 + regularity*0.18 + detail*0.26 +
+          (1-smooth)*0.10 + (1-complexityPenalty)*0.05 +
+          (1-svgPenalty)*0.03;
+ }
+
+ for(const lines of lineCandidates){
+   for(const amp of ampCandidates){
+     for(const freq of freqCandidates){
+       for(const contrast of contrastCandidates){
+         const s=score(lines,amp,freq,contrast,targetThreshold);
+         if(!best||s>best.score)best={score:s,lines,amp,freq,contrast,threshold:targetThreshold};
+       }
+     }
+   }
+ }
+
+ // Restaurer puis appliquer le meilleur profil.
+ C.lines.value=Math.round(best.lines);
+ C.amp.value=Math.round(best.amp);
+ C.freq.value=best.freq.toFixed(1);
+ C.contrast.value=best.contrast.toFixed(1);
+ C.threshold.value=best.threshold.toFixed(0);
+ C.sample.value=std>0.25?42:30;
+ C.quality.value=2;
+ C.mode.value="dark";
+ C.invert.checked=false;
+ labels();
+ render();
+
+ $("analysisResult").textContent=
+   `✓ Réglages optimisés : ${C.lines.value} lignes · amplitude ${C.amp.value}% · fréquence ${C.freq.value} · contraste ${C.contrast.value}.`;
+
+ button.disabled=false;
+ button.textContent="✨ Analyser & trouver le meilleur résultat";
+}
+
+function svg(){
+ const g=generatePaths(),sw=Math.max(.45,Math.min(1.7,g.w/1800));
+ return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${g.w}" height="${g.h}" viewBox="0 0 ${g.w} ${g.h}">
+<g fill="none" stroke="#000" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round">
+${g.paths.map(d=>`<path d="${d}"/>`).join("\n")}
+</g>
+</svg>`;
+}
+
+$("file").addEventListener("change",e=>{
+ const f=e.target.files[0];if(!f)return;
+ const u=URL.createObjectURL(f);const im=new Image();
+ im.onload=()=>{img=im;prepare();$("export").disabled=false;$("analyze").disabled=false;render();URL.revokeObjectURL(u)};
+ im.onerror=()=>{ $("status").textContent="Image illisible.";URL.revokeObjectURL(u)};
+ im.src=u;
+});
+Object.values(C).forEach(x=>{x.addEventListener("input",schedule);x.addEventListener("change",schedule)});
+$("reset").onclick=()=>{
+ C.lines.value=120;C.amp.value=32;C.freq.value=4;C.contrast.value=1.6;C.threshold.value=4;
+ C.sample.value=35;C.smooth.value=3;C.quality.value=2;C.mode.value="dark";C.invert.checked=false;labels();$("analysisResult").textContent="";render();
+};
+$("analyze").onclick=autoAnalyze;
+$("export").onclick=()=>{
+ const blob=new Blob([svg()],{type:"image/svg+xml;charset=utf-8"}),u=URL.createObjectURL(blob),a=document.createElement("a");
+ a.href=u;a.download="wavy-halftone-pro.svg";a.click();URL.revokeObjectURL(u);
+};
+labels();
+})();
+</script>
+</body>
+</html>
