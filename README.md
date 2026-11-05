@@ -9,6 +9,8 @@
 
 Une application web 100% côté client (aucun serveur requis) avec prévisualisation en temps réel sur Canvas, analyse automatique de contraste et export direct en **SVG vectoriel optimisé**.
 
+▶️ **Démo en ligne : https://cbdu34.github.io/4XIDRAW-LOGICIEL/**
+
 ---
 
 ## ✨ Fonctionnalités
@@ -42,8 +44,8 @@ Comme il s'agit d'une application standalone, il suffit d'ouvrir le fichier :
    xdg-open index.html # ou firefox index.html / google-chrome index.html
    ```
 
-### Option 2 : Via GitHub Pages
-Activez GitHub Pages dans les réglages du dépôt (`Settings > Pages > Branch: main`) pour rendre l'outil accessible instantanément en ligne sans aucune installation !
+### Option 2 : Version en ligne (GitHub Pages)
+Aucune installation nécessaire : ouvrez directement **https://cbdu34.github.io/4XIDRAW-LOGICIEL/**.
 
 ---
 
@@ -62,3 +64,9 @@ Activez GitHub Pages dans les réglages du dépôt (`Settings > Pages > Branch: 
 Les suggestions d'algorithmes (cross-hatching, spirales, optimisation TSP des tracés) ou d'améliorations de l'interface sont les bienvenues ! 
 
 ⭐️ **Si cet outil vous est utile pour vos projets de dessin ou de découpe, laissez une étoile sur le dépôt !**
+
+---
+
+## 📄 Licence
+
+Distribué sous licence MIT. Voir le fichier [LICENSE](LICENSE).
